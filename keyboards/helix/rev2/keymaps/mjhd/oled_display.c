@@ -27,8 +27,8 @@ enum layer_number {
     _SYMBOLS,
     _BRACES,
     _FUNCTIONS,
-    _GAMING,
-    _KEYBOARD
+    _KEYBOARD,
+    _TENKEYS
 };
 
 //SSD1306 OLED update loop, make sure to add #define SSD1306OLED in config.h
@@ -66,8 +66,8 @@ void matrix_update(struct CharacterMatrix *dest,
 #define L_SYMBOLS (1<<_SYMBOLS)
 #define L_BRACES (1<<_BRACES)
 #define L_FUNCTIONS (1<<_FUNCTIONS)
-#define L_GAMING (1<<_GAMING)
 #define L_KEYBOARD (1<<_KEYBOARD)
+#define L_TENKEYS (1<<_TENKEYS)
 
 #    ifdef SSD1306OLED
 static void render_logo(struct CharacterMatrix *matrix) {
@@ -126,11 +126,11 @@ static void render_layer_status(void) {
     case L_FUNCTIONS:
         oled_write_P(PSTR("Functions"), false);
         break;
-    case L_GAMING:
-        oled_write_P(PSTR("Gaming"), false);
-        break;
     case L_KEYBOARD:
         oled_write_P(PSTR("Keyboard"), false);
+        break;
+    case L_TENKEYS:
+        oled_write_P(PSTR("TenKeys"), false);
         break;
     default:
         oled_write_P(PSTR("Undef-"), false);
