@@ -19,6 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include OLED_FONT_H
 #include "timer.h"
 #include "print.h"
+#include "gpio.h"
+#include "wait.h"
 
 #include <string.h>
 
@@ -80,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define ENABLE_BLINK 0x30
 
 // Charge Pump Commands
-#define CHARGE_PUMP 0x8D
+//#define CHARGE_PUMP 0x8D
 
 // Misc defines
 #ifndef OLED_BLOCK_COUNT
@@ -161,11 +163,23 @@ static void InvertCharacter(uint8_t *cursor) {
 }
 
 bool oled_init(oled_rotation_t rotation) {
-#if defined(USE_I2C) && defined(SPLIT_KEYBOARD)
-    if (!is_keyboard_master()) {
-        return true;
-    }
-#endif
+#define RST GP12
+#define CS GP9
+#define DC GP8
+
+    setPinOutput(RST);
+    setPinOutput(CS);
+    setPinOutput(DC);
+
+    // RESET HW
+    writePinHigh(RST);
+    wait_ms(100);
+    writePinLow(RST);
+    wait_ms(100);
+    writePinHigh(CS);
+    writePinLow(DC);
+    writePinHigh(RST);
+    wait_ms(100);
 
     oled_rotation = oled_init_user(oled_init_kb(rotation));
     if (!HAS_FLAGS(oled_rotation, OLED_ROTATION_90)) {
@@ -178,43 +192,34 @@ bool oled_init(oled_rotation_t rotation) {
     static const uint8_t PROGMEM display_setup1[] = {
         I2C_CMD,
         DISPLAY_OFF,
-        DISPLAY_CLOCK,
-        0x80,
+        0x04,
+        0x10,
+        DISPLAY_START_LINE | 0x00,
+        CONTRAST,
+        OLED_BRIGHTNESS,
+        SEGMENT_REMAP_INV,
+        NORMAL_DISPLAY,
         MULTIPLEX_RATIO,
         OLED_DISPLAY_HEIGHT - 1,
+        COM_SCAN_DEC,
         DISPLAY_OFFSET,
         0x00,
-        DISPLAY_START_LINE | 0x00,
-        CHARGE_PUMP,
-        0x14,
-#if (OLED_IC != OLED_IC_SH1106)
-        // MEMORY_MODE is unsupported on SH1106 (Page Addressing only)
+        DISPLAY_CLOCK,
+        0xF0,
+        0xD8, // Set Area Color Mode ON/OFF
+        0x05, // Low Power Display Mode
+        PRE_CHARGE_PERIOD,
+        0xC2,
+        COM_PINS,
+        COM_PINS_ALT,
+        VCOM_DETECT,
+        0x08,
         MEMORY_MODE,
         0x00, // Horizontal addressing mode
-#endif
+        DISPLAY_ON,
     };
     if (I2C_TRANSMIT_P(display_setup1) != I2C_STATUS_SUCCESS) {
         print("oled_init cmd set 1 failed\n");
-        return false;
-    }
-
-    if (!HAS_FLAGS(oled_rotation, OLED_ROTATION_180)) {
-        static const uint8_t PROGMEM display_normal[] = {I2C_CMD, SEGMENT_REMAP_INV, COM_SCAN_DEC};
-        if (I2C_TRANSMIT_P(display_normal) != I2C_STATUS_SUCCESS) {
-            print("oled_init cmd normal rotation failed\n");
-            return false;
-        }
-    } else {
-        static const uint8_t PROGMEM display_flipped[] = {I2C_CMD, SEGMENT_REMAP, COM_SCAN_INC};
-        if (I2C_TRANSMIT_P(display_flipped) != I2C_STATUS_SUCCESS) {
-            print("display_flipped failed\n");
-            return false;
-        }
-    }
-
-    static const uint8_t PROGMEM display_setup2[] = {I2C_CMD, COM_PINS, OLED_COM_PINS, CONTRAST, OLED_BRIGHTNESS, PRE_CHARGE_PERIOD, 0xF1, VCOM_DETECT, 0x20, DISPLAY_ALL_ON_RESUME, NORMAL_DISPLAY, DEACTIVATE_SCROLL, DISPLAY_ON};
-    if (I2C_TRANSMIT_P(display_setup2) != I2C_STATUS_SUCCESS) {
-        print("display_setup2 failed\n");
         return false;
     }
 
@@ -229,6 +234,7 @@ bool oled_init(oled_rotation_t rotation) {
     oled_initialized = true;
     oled_active      = true;
     oled_scrolling   = false;
+
     return true;
 }
 
